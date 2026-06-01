@@ -7,17 +7,20 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import { count, eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { cache } from 'react';
-export const createTRPCContext = cache(async () => {
+
+export type TRPCContext = Awaited<ReturnType<typeof createTRPCContext>>;
+
+export const createTRPCContext = cache(async (opts?: { req?: Request }) => {
   /**
    * @see: https://trpc.io/docs/server/context
    */
-  return { userId: 'user_123' };
+  return { req: opts?.req };
 });
 // Avoid exporting the entire t-object
 // since it's not very descriptive.
 // For instance, the use of a t variable
 // is common in i18n libraries.
-const t = initTRPC.create({
+const t = initTRPC.context<TRPCContext>().create({
   /**
    * @see https://trpc.io/docs/server/data-transformers
    */
@@ -28,8 +31,16 @@ export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure;
 export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
+  let headersList: Headers;
+  
+  if (ctx.req instanceof Request) {
+    headersList = ctx.req.headers;
+  } else {
+    headersList = await headers();
+  }
+  
   const session = await auth.api.getSession({
-    headers: await headers(),
+    headers: headersList,
   });
 
   if (!session) {
