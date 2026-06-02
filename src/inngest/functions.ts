@@ -8,9 +8,14 @@ import { inngest } from "@/inngest/client";
 
 import { StreamTranscriptItem } from "@/modules/meetings/types";
 
-const summarizer = createAgent({
-  name: "summarizer",
-  system: `
+// Lazy initialize the summarizer to avoid loading GPT-4O at module startup
+let summarizer: ReturnType<typeof createAgent> | null = null;
+
+function getSummarizer() {
+  if (!summarizer) {
+    summarizer = createAgent({
+      name: "summarizer",
+      system: `
     You are an expert summarizer. You write readable, concise, simple content. You are given a transcript of a meeting and you need to summarize it.
 
 Use the following markdown structure for every output:
@@ -31,8 +36,11 @@ Example:
 - Feature X automatically does Y
 - Mention of integration with Z
   `.trim(),
-  model: openai({ model: "gpt-4o", apiKey: process.env.OPENAI_API_KEY }),
-});
+      model: openai({ model: "gpt-4o", apiKey: process.env.OPENAI_API_KEY }),
+    });
+  }
+  return summarizer;
+}
 
 export const meetingsProcessing = inngest.createFunction(
   { id: "meetings/processing", triggers: [{ event: "meetings/processing" }] },
@@ -95,7 +103,7 @@ export const meetingsProcessing = inngest.createFunction(
       });
     });
 
-    const { output } = await summarizer.run(
+    const { output } = await getSummarizer().run(
       "Summarize the following transcript: " +
         JSON.stringify(transcriptWithSpeakers)
     );

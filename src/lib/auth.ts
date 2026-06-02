@@ -8,6 +8,8 @@ import * as schema from "@/db/schema";
 import { polarClient } from "./polar";
 
 export const auth = betterAuth({
+  baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+  basePath: "/api/auth",
   plugins: [
     polar({
       client: polarClient,
