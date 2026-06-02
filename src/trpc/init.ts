@@ -51,46 +51,58 @@ export const protectedProcedure = baseProcedure.use(async ({ ctx, next }) => {
 });
 export const premiumProcedure = (entity: "meetings" | "agents") =>
   protectedProcedure.use(async ({ ctx, next }) => {
-    const customer = await polarClient.customers.getStateExternal({
-      externalId: ctx.auth.user.id,
-    });
-
-    const [userMeetings] = await db
-      .select({
-        count: count(meetings.id),
-      })
-      .from(meetings)
-      .where(eq(meetings.userId, ctx.auth.user.id));
-
-    const [userAgents] = await db
-      .select({
-        count: count(agents.id),
-      })
-      .from(agents)
-      .where(eq(agents.userId, ctx.auth.user.id));
-
-    const isPremium = customer.activeSubscriptions.length > 0;
-    const isFreeAgentLimitReached = userAgents.count >= MAX_FREE_AGENTS;
-    const isFreeMeetingLimitReached = userMeetings.count >= MAX_FREE_MEETINGS;
-
-    const shouldThrowMeetingError =
-      entity === "meetings" && isFreeMeetingLimitReached && !isPremium;
-    const shouldThrowAgentError =
-      entity === "agents" && isFreeAgentLimitReached && !isPremium;
-
-    if (shouldThrowMeetingError) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You have reached the maximum number of free meetings",
+    try {
+      const customer = await polarClient.customers.getStateExternal({
+        externalId: ctx.auth.user.id,
       });
-    }
 
-    if (shouldThrowAgentError) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "You have reached the maximum number of free agents",
-      });
-    }
+      const [userMeetings] = await db
+        .select({
+          count: count(meetings.id),
+        })
+        .from(meetings)
+        .where(eq(meetings.userId, ctx.auth.user.id));
 
-    return next({ ctx: { ...ctx, customer } });
+      const [userAgents] = await db
+        .select({
+          count: count(agents.id),
+        })
+        .from(agents)
+        .where(eq(agents.userId, ctx.auth.user.id));
+
+      const isPremium = customer.activeSubscriptions.length > 0;
+      const isFreeAgentLimitReached = userAgents.count >= MAX_FREE_AGENTS;
+      const isFreeMeetingLimitReached = userMeetings.count >= MAX_FREE_MEETINGS;
+
+      const shouldThrowMeetingError =
+        entity === "meetings" && isFreeMeetingLimitReached && !isPremium;
+      const shouldThrowAgentError =
+        entity === "agents" && isFreeAgentLimitReached && !isPremium;
+
+      if (shouldThrowMeetingError) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You have reached the maximum number of free meetings",
+        });
+      }
+
+      if (shouldThrowAgentError) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You have reached the maximum number of free agents",
+        });
+      }
+
+      return next({ ctx: { ...ctx, customer } });
+    } catch (error) {
+      // If Polar API fails, allow access (fail-open)
+      // Users can create/access but subscription features may not work
+      console.error("[premiumProcedure] Polar API error:", error);
+      
+      const customer = {
+        activeSubscriptions: [],
+      };
+
+      return next({ ctx: { ...ctx, customer } });
+    }
   });
