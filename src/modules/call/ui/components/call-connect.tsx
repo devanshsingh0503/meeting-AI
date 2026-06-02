@@ -61,8 +61,25 @@ export const CallConnect = ({
       if (!client) return;
 
       const _call = client.call("default", meetingId);
-      _call.camera.disable();
-      _call.microphone.disable();
+      
+      // Request permissions and enable camera/microphone
+      const setupMedia = async () => {
+        try {
+          // Request camera permission
+          await _call.camera.enable();
+        } catch (error) {
+          console.warn("Camera permission denied or unavailable:", error);
+        }
+        
+        try {
+          // Request microphone permission
+          await _call.microphone.enable();
+        } catch (error) {
+          console.warn("Microphone permission denied or unavailable:", error);
+        }
+      };
+      
+      setupMedia();
       setCall(_call);
 
       return () => {

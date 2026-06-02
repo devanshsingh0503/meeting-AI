@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogInIcon } from "lucide-react";
+import { useEffect } from "react";
 import {
   DefaultVideoPlaceholder,
   StreamVideoParticipant,
@@ -42,7 +43,7 @@ const DisabledVideoPreview = () => {
 const AllowBrowserPermissions = () => {
   return (
     <p className="text-sm">
-      Please grant your browser a permission to access your camera and
+      Please grant your browser permission to access your camera and
       microphone.
     </p>
   );
@@ -55,6 +56,27 @@ export const CallLobby = ({ onJoin }: Props) => {
   const { hasBrowserPermission: hasCameraPermission } = useCameraState();
 
   const hasBrowserMediaPermission = hasCameraPermission && hasMicPermission;
+
+  // Request permissions when component mounts
+  useEffect(() => {
+    const requestPermissions = async () => {
+      try {
+        // Request camera permission
+        await navigator.mediaDevices.getUserMedia({ video: true });
+      } catch (error) {
+        console.warn("Camera permission denied:", error);
+      }
+
+      try {
+        // Request microphone permission
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (error) {
+        console.warn("Microphone permission denied:", error);
+      }
+    };
+
+    requestPermissions();
+  }, []);
 
   return (
     <div className="flex flex-col items-center justify-center h-full bg-radial from-sidebar-accent to-sidebar">
